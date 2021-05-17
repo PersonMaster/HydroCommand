@@ -1,0 +1,85 @@
+options:
+  AddonName: HydroCommand
+  AddonAuthor: TrueFusion
+  AddonVersion: 1.0
+  AddonDescription: Create commands in Hydrogen with a command manager.
+
+on load:
+  wait 2 ticks
+  if file path "plugins/Skript/scripts/HydroCommand/" is missing:
+    create file path "plugins/Skript/scripts/HydroCommand/"
+    HydroLog("HydroCommand: Created essential files.")
+  loop all the files in file path "plugins/Skript/scripts/HydroCommand/":
+    set {_file} to last element out of split "%loop-value%" at "\"
+    execute console command "sk reload HydroCommand/%{_file}%"
+
+function Hydrogen_Addon_HydroCommand_Effect(line: string, effect: string, event: string, data: strings=""):
+  set {_code::*} to split {_effect} at ","
+  loop {_data::*}:
+    set {_dataSplit::*} to split loop-value at ":"
+    set {_type} to {_dataSplit::1}
+    delete {_dataSplit::1}
+    set {_value} to join {_dataSplit::*} with ":"
+    set {_%{_type}%} to {_value}
+  if {_code::1} is "command":
+    if size of {_code::*} is 3:
+      if {_code::2} is "create":
+        create file path "plugins/Skript/scripts/HydroCommand/Command-%{_code::3}%.sk" with content "command /%{_code::3}%:", "  trigger:", "    set {_none} to {_none}"
+      else if {_code::2} is "delete":
+        if file path "plugins/Skript/scripts/HydroCommand/" is not missing:
+          set {_command} to {_code::3}
+          loop size of lines of file path "plugins/Skript/scripts/HydroCommand/Command-%{_code::3}%.sk" times:
+            add 1 to {_i}
+            set line {_i} of file path "plugins/Skript/scripts/HydroCommand/Command-%{_code::3}%.sk" to ""
+          wait a tick
+          execute console command "sk reload HydroCommand/Command-%{_command}%.sk"
+          wait a tick
+          delete file path "plugins/Skript/scripts/HydroCommand/Command-%{_code::3}%.sk"
+        else:
+          HydroLog("&cHydroCommand: There is already a HydroCommand with this name. Line: %{_line}%&c. Effect: %{_effect}%")
+    else:
+      HydroLog("&cHydroCommand: The command effect requires at least 2 sections. Line: %{_line}%&c. Effect: %{_effect}%")
+  else if {_code::1} is "execute":
+    if {_code::2} is "hydrogen":
+      delete {_code::1}
+      set {_newEffect} to join {_code::*} with ","
+      Hydrogen_executeEffect({_line}, {_newEffect}, "HydroCommand", ("player:%{_player}%", "command:%{_command}%", "fullCommand:%{_fullCommand}%"))
+    else if {_code::2} is "addon":
+      if size of {_code::*} is more than 3:
+        if {_code::3} is not "HydroCommand":
+          if "%indices of {Hydrogen::Addons::*}%" contains {_code::3}:
+            delete {_code::1}
+            delete {_code::2}
+            set {_addon} to {_code::3}
+            delete {_code::3}
+            set {_newEffect} to join {_code::*} with ","
+            execute "Hydrogen_Addon_%{_addon}%_Effect({_line}, {_newEffect}, ""HydroCommand"", (""player:%{_player}%"", ""command:%{_command}%"", ""fullCommand:%{_fullCommand}%""))"
+          else:
+            HydroLog("&cHydroCommand: Unknown addon. Line: %{_line}%&c. Effect: %{_effect}%")
+        else:
+          HydroLog("&cHydroCommand: You cannot use a HydroCommand effect in a HydroCommand effect. Line: %{_line}%&c. Effect: %{_effect}%")
+      else:
+        HydroLog("&cHydroCommand: The addon part of HydroCommand'&cs execute effect requires at least 3 sections. Line: %{_line}%&c. Effect: %{_effect}%")
+    else:
+      delete {_code::1}
+      set {_newEffect} to join {_code::*} with ","
+      Hydrogen_executeEffect({_line}, {_newEffect}, "HydroCommand", ("player:%{_player}%", "command:%{_command}%", "fullCommand:%{_fullCommand}%"))
+  else:
+    HydroLog("&cHydroCommand: Unknown effect. Line: %{_line}%&c. Effect: %{_effect}%")
+
+on load:
+  loop Hydrogen_callEvents("HydroCommandLoad: "):
+    set {_rr::*} to split loop-value at ":"
+    set {_line} to first element out of {_rr::*}
+    delete {_rr::1}
+    set {_effect} to join {_rr::*} with ":"
+    Hydrogen_Addon_HydroCommand_Effect({_line}, {_effect}, "HydroCommandLoad")
+
+on command:
+  loop Hydrogen_callEvents("HydroCommand (/%command%): "):
+    cancel event
+    set {_rr::*} to split loop-value at ":"
+    set {_line} to first element out of {_rr::*}
+    delete {_rr::1}
+    set {_effect} to join {_rr::*} with ":"
+    Hydrogen_Addon_HydroCommand_Effect({_line}, {_effect}, "HydroCommand", ("player:%player%", "command:%command%", "fullCommand:%full command%"))
